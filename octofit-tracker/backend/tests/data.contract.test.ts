@@ -43,6 +43,48 @@ describe('OctoFit data contract', () => {
     expect(error?.errors.difficulty).toBeDefined();
   });
 
+  it('enforces unique keys used by the demo seed', async () => {
+    const mongo = await MongoMemoryServer.create();
+    try {
+      await mongoose.connect(mongo.getUri());
+      await Promise.all([User.init(), Team.init(), Workout.init(), Activity.init()]);
+
+      await User.create({ name: 'Mona', email: 'mona@example.com', fitnessGoal: 'endurance' });
+      await expect(User.create({
+        name: 'Duplicate Mona',
+        email: 'mona@example.com',
+        fitnessGoal: 'strength',
+      })).rejects.toMatchObject({ code: 11000 });
+
+      await Team.create({ name: 'Octocats', mascot: 'Mona' });
+      await expect(Team.create({ name: 'Octocats', mascot: 'Duplicate' })).rejects.toMatchObject({ code: 11000 });
+
+      await Workout.create({ title: 'Intervals', focus: 'endurance', minutes: 30, difficulty: 'moderate' });
+      await expect(Workout.create({
+        title: 'Intervals',
+        focus: 'strength',
+        minutes: 20,
+        difficulty: 'easy',
+      })).rejects.toMatchObject({ code: 11000 });
+
+      const user = new mongoose.Types.ObjectId();
+      const team = new mongoose.Types.ObjectId();
+      const occurredAt = new Date('2026-01-10T12:00:00.000Z');
+      await Activity.create({ user, team, type: 'run', minutes: 40, points: 40, occurredAt });
+      await expect(Activity.create({
+        user,
+        team,
+        type: 'run',
+        minutes: 20,
+        points: 20,
+        occurredAt,
+      })).rejects.toMatchObject({ code: 11000 });
+    } finally {
+      await mongoose.disconnect();
+      await mongo.stop();
+    }
+  }, 60_000);
+
   it('seeds representative data for all four capabilities idempotently', async () => {
     const mongo = await MongoMemoryServer.create();
     const previousUri = process.env.MONGODB_URI;
