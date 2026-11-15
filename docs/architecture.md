@@ -30,13 +30,13 @@ OctoFit Tracker is a three-tier application for a school fitness program. The st
 
 Record your plan here before editing code.
 
-- Presentation tier decision:
-- Logic tier decision:
-- Data tier decision:
-- Activity tracking approach:
-- Team management approach:
-- Leaderboard approach:
-- Workout suggestions approach:
+- Presentation tier decision: Build the UI as a small React Router app using Bootstrap cards and accessible status/empty/error messaging. Each feature page will fetch from the shared API client, render loading states immediately, and fail gracefully with clear alerts when the backend is unavailable.
+- Logic tier decision: Keep Express routes thin and delegate all business rules to service functions in `src/services/octofitService.ts`. Validation will convert malformed payloads into deliberate 4xx errors, while the router remains responsible only for HTTP shape and error forwarding.
+- Data tier decision: Use Mongoose schemas to enforce required fields and types, keep references to `User` and `Team`, and let the service layer handle aggregation and seed reconciliation. Shared database configuration will centralize connection setup and environment variables instead of duplicating connection logic.
+- Activity tracking approach: Accept `userId`, `teamId`, `type`, and `minutes`, verify that both references exist, compute `points` from minutes and activity type, and persist `occurredAt` with a valid ISO timestamp. Invalid IDs or missing users/teams will return 400/404 style 4xx responses without leaking database cast errors.
+- Team management approach: Require `name` and `mascot` on team creation, normalize members to ObjectId arrays, and keep the list endpoint returning team summaries with member IDs. When seeding demo data, reconcile an existing user’s previous team membership before moving them into the seeded Octocats team.
+- Leaderboard approach: Aggregate `Activity` records by team, sum points, and sort descending. The API will return `{ teamName, totalPoints, rank }` with 1-based ranking values while preserving deterministic ordering for ties via team name or insertion order.
+- Workout suggestions approach: Look up the target user by email, inspect the latest relevant activity pattern or fitness goal, and rank Workout documents by matching focus. The first suggestion will include a human-readable `reason` string and a 4xx response for unknown email addresses.
 
 ## Test plan
 
