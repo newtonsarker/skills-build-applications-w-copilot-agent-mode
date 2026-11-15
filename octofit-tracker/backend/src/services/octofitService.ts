@@ -15,10 +15,10 @@ function requireNonEmptyString(value: unknown, field: string) {
 function requirePositiveNumber(value: unknown, field: string) {
   if (typeof value === 'string') {
     const num = Number(value);
-    if (Number.isFinite(num) && num > 0) return num;
+    if (Number.isFinite(num) && num >= 1) return num;
   }
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
-  throw httpError(`${field} must be a positive number`, 400);
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 1) return value;
+  throw httpError(`${field} must be at least 1`, 400);
 }
 
 function normalizeObjectId(value: unknown, field: string) {
@@ -27,6 +27,10 @@ function normalizeObjectId(value: unknown, field: string) {
     throw httpError(`${field} is invalid`, 400);
   }
   return new mongoose.Types.ObjectId(input);
+}
+
+function isDuplicateKeyError(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
 }
 
 function inferWorkoutFocus(goal: string | undefined, recentTypes: string[]) {
@@ -88,13 +92,19 @@ export async function createTeam(input: unknown) {
 
   const members = membersValue.map((memberId, index) => normalizeObjectId(memberId, `members[${index}]`));
 
-  const team = await Team.create({
-    name,
-    mascot,
-    members,
-  });
-
-  return team.toObject();
+  try {
+    const team = await Team.create({
+      name,
+      mascot,
+      members,
+    });
+    return team.toObject();
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw httpError('A team with this name already exists', 409);
+    }
+    throw error;
+  }
 }
 
 export async function getLeaderboard() {
